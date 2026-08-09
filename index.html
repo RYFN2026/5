@@ -13,6 +13,7 @@
             font-family: 'Press Start 2P', monospace;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
         body {
             background-color: #05000a;
@@ -114,60 +115,63 @@
         }
         .hud-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-        /* 手機專用虛擬控制按鈕樣式 */
+        /* 手機專用虛擬控制按鈕樣式 (加大版) */
         #mobile-controls {
             position: absolute;
-            bottom: 0;
+            top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 6;
-            display: none; /* 遊戲開始時顯示 */
+            z-index: 100;
+            display: none; 
             justify-content: space-between;
             align-items: flex-end;
-            padding: 20px;
+            padding: 25px;
         }
         .virtual-btn {
-            pointer-events: auto;
-            background: rgba(0, 0, 0, 0.6);
+            pointer-events: auto !important;
+            background: rgba(0, 0, 0, 0.7);
             border: 3px solid #00ffcc;
             color: #00ffcc;
             font-size: 16px;
             font-weight: bold;
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
             display: flex;
             justify-content: center;
             align-items: center;
-            text-shadow: 0 0 5px #00ffcc;
-            active: scale(0.95);
+            text-shadow: 0 0 8px #00ffcc;
+            cursor: pointer;
         }
-        .virtual-btn:active {
-            background: rgba(0, 255, 204, 0.3);
+        .virtual-btn:active, .virtual-btn.touched {
+            background: rgba(0, 255, 204, 0.4);
             color: #fff;
         }
-        /* 左側跳躍按鈕 (正方形或圓形大按鈕) */
+        /* 左側跳躍按鈕 (加大) */
         #btn-jump {
-            width: 100px;
-            height: 100px;
+            width: 130px;
+            height: 130px;
             border-radius: 50%;
             border-color: #00ffcc;
             margin-bottom: 10px;
+            font-size: 20px;
         }
-        /* 右下角衝刺按鈕 (橫長方形) */
+        /* 右下角衝刺按鈕 (橫長方形、加大加寬) */
         #btn-dash {
-            width: 160px;
-            height: 60px;
-            border-radius: 8px;
+            width: 200px;
+            height: 75px;
+            border-radius: 12px;
             border-color: #ff00ff;
             color: #ff00ff;
-            box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
             margin-bottom: 15px;
-            font-size: 14px;
-            letter-spacing: 1px;
+            font-size: 18px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px #ff00ff;
         }
-        #btn-dash:active {
-            background: rgba(255, 0, 255, 0.3);
+        #btn-dash:active, #btn-dash.touched {
+            background: rgba(255, 0, 255, 0.4);
+            color: #fff;
         }
         
         .overlay-screen {
@@ -668,7 +672,7 @@
         };
     </script>
 
-    <!-- 遊戲主體與完全原生打字保護 -->
+    <!-- 遊戲主體與修復橫屏觸控邏輯 -->
     <script>
         window.addEventListener('keydown', function(e) {
             let nameInput = document.getElementById('playerNameInput');
@@ -816,7 +820,6 @@
             });
         }
 
-        // 鍵盤事件
         window.addEventListener('keydown', e => {
             let nameInput = document.getElementById('playerNameInput');
             if (nameInput && document.activeElement === nameInput) return;
@@ -841,37 +844,48 @@
             }
         });
 
-        // 手機虛擬按鈕事件繫結 (支援觸控與滑鼠點擊)
+        // 徹底修復橫屏與各型手機觸控不靈敏 / 無法按壓問題
         const btnJump = document.getElementById('btn-jump');
         const btnDash = document.getElementById('btn-dash');
 
-        btnJump.addEventListener('touchstart', e => {
+        function handleJumpStart(e) {
             e.preventDefault();
+            e.stopPropagation();
             initAudio();
             if (gameState === 'PLAYING') jump();
-        });
-        btnJump.addEventListener('mousedown', e => {
-            e.preventDefault();
-            initAudio();
-            if (gameState === 'PLAYING') jump();
-        });
+        }
 
-        btnDash.addEventListener('touchstart', e => {
+        function handleDashStart(e) {
             e.preventDefault();
+            e.stopPropagation();
             initAudio();
-            if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) triggerDash(true);
-        });
-        btnDash.addEventListener('touchend', e => {
+            if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) {
+                triggerDash(true);
+                btnDash.classList.add('touched');
+            }
+        }
+
+        function handleDashEnd(e) {
             e.preventDefault();
-            if (player.isDash) triggerDash(false);
-        });
-        btnDash.addEventListener('mousedown', e => {
-            e.preventDefault();
-            initAudio();
-            if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) triggerDash(true);
-        });
-        window.addEventListener('mouseup', e => {
-            if (player.isDash) triggerDash(false);
+            e.stopPropagation();
+            if (player.isDash) {
+                triggerDash(false);
+                btnDash.classList.remove('touched');
+            }
+        }
+
+        btnJump.addEventListener('touchstart', handleJumpStart, { passive: false });
+        btnJump.addEventListener('mousedown', handleJumpStart);
+
+        btnDash.addEventListener('touchstart', handleDashStart, { passive: false });
+        btnDash.addEventListener('touchend', handleDashEnd, { passive: false });
+        btnDash.addEventListener('touchcancel', handleDashEnd, { passive: false });
+        btnDash.addEventListener('mousedown', handleDashStart);
+        window.addEventListener('mouseup', () => {
+            if (player.isDash) {
+                triggerDash(false);
+                btnDash.classList.remove('touched');
+            }
         });
 
         function jump() {
@@ -912,7 +926,7 @@
             document.getElementById('gameover-screen').style.display = 'none';
             document.getElementById('modal-leaderboard').style.display = 'none';
             document.getElementById('hud-layer').style.display = 'flex';
-            document.getElementById('mobile-controls').style.display = 'flex'; // 顯示手機控制按鈕
+            document.getElementById('mobile-controls').style.display = 'flex';
 
             lastTime = performance.now();
             requestAnimationFrame(loop);
@@ -1003,7 +1017,7 @@
 
             if (player.isDash) {
                 player.dashTimeLeft -= ts;
-                if (player.dashTimeLeft <= 0) { player.dashTimeLeft = 0; triggerDash(false); }
+                if (player.dashTimeLeft <= 0) { player.dashTimeLeft = 0; triggerDash(false); btnDash.classList.remove('touched'); }
             } else {
                 if (player.dashTimeLeft < 120) { player.dashTimeLeft += 0.5 * ts; if (player.dashTimeLeft > 120) player.dashTimeLeft = 120; }
             }
@@ -1106,7 +1120,7 @@
             playSound('crash');
             createParticles(player.x, player.y, '#ff0000', 40);
             document.getElementById('hud-layer').style.display = 'none';
-            document.getElementById('mobile-controls').style.display = 'none'; // 隱藏手機按鈕
+            document.getElementById('mobile-controls').style.display = 'none';
             document.getElementById('finalScoreVal').innerText = score;
             document.getElementById('gameover-screen').style.display = 'flex';
             
