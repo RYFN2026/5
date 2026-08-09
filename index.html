@@ -320,6 +320,11 @@
 </head>
 <body oncontextmenu="return false;">
 
+    <!-- 最早的背景音樂音軌 (預設循環播放) -->
+    <audio id="bgmAudio" loop preload="auto">
+        <source src="https://vgmsite.com/soundtracks/contra-nes/11%20Stage%201%20%28Jungle%29.mp3" type="audio/mp3">
+    </audio>
+
     <div id="game-container">
         <div id="crt-overlay"></div>
         <canvas id="gameCanvas" oncontextmenu="return false;"></canvas>
@@ -612,6 +617,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const gameContainer = document.getElementById('game-container');
+        const bgmAudio = document.getElementById('bgmAudio');
 
         function resizeCanvas() {
             canvas.width = 1280;
@@ -621,7 +627,6 @@
         window.addEventListener('resize', resizeCanvas);
 
         let audioCtx = null;
-        let bgmInterval = null;
 
         function initAudioContext() {
             if (!audioCtx) {
@@ -633,55 +638,30 @@
             }
         }
 
-        // 8-Bit 復古電玩動態背景音樂合成引擎
-        const bassNotes = [110, 110, 146.83, 130.81, 98, 98, 123.47, 110];
-        const melodyNotes = [220, 261.63, 293.66, 329.63, 392, 329.63, 293.66, 261.63, 220, 329.63, 440, 392];
-        let noteIndex = 0;
-
-        function playBGMStep() {
-            if (!audioCtx || gameState !== 'PLAYING') return;
-            try {
-                let t = audioCtx.currentTime;
-                
-                // 低音軌
-                let osc1 = audioCtx.createOscillator();
-                let gain1 = audioCtx.createGain();
-                osc1.type = 'triangle';
-                osc1.frequency.setValueAtTime(bassNotes[Math.floor(noteIndex / 2) % bassNotes.length], t);
-                gain1.gain.setValueAtTime(0.08, t);
-                gain1.gain.linearRampToValueAtTime(0.01, t + 0.18);
-                osc1.connect(gain1);
-                gain1.connect(audioCtx.destination);
-                osc1.start(t); osc1.stop(t + 0.18);
-
-                // 主旋律軌
-                if (noteIndex % 2 === 0) {
-                    let osc2 = audioCtx.createOscillator();
-                    let gain2 = audioCtx.createGain();
-                    osc2.type = 'square';
-                    osc2.frequency.setValueAtTime(melodyNotes[(noteIndex / 2) % melodyNotes.length], t);
-                    gain2.gain.setValueAtTime(0.06, t);
-                    gain2.gain.linearRampToValueAtTime(0.01, t + 0.15);
-                    osc2.connect(gain2);
-                    gain2.connect(audioCtx.destination);
-                    osc2.start(t); osc2.stop(t + 0.15);
-                }
-
-                noteIndex++;
-            } catch(e) {}
+        // 解鎖並播放最早的音樂與音效
+        function unlockAndPlayAudio() {
+            initAudioContext();
+            if (bgmAudio) {
+                bgmAudio.volume = 0.6;
+                bgmAudio.play().catch(() => {});
+            }
         }
 
+        window.addEventListener('pointerdown', unlockAndPlayAudio, { once: false });
+        window.addEventListener('touchstart', unlockAndPlayAudio, { once: false, passive: true });
+        window.addEventListener('mousedown', unlockAndPlayAudio, { once: false });
+
         function startBGM() {
-            initAudioContext();
-            if (bgmInterval) clearInterval(bgmInterval);
-            noteIndex = 0;
-            bgmInterval = setInterval(playBGMStep, 200);
+            unlockAndPlayAudio();
+            if (bgmAudio) {
+                bgmAudio.currentTime = 0;
+                bgmAudio.play().catch(() => {});
+            }
         }
 
         function stopBGM() {
-            if (bgmInterval) {
-                clearInterval(bgmInterval);
-                bgmInterval = null;
+            if (bgmAudio) {
+                bgmAudio.pause();
             }
         }
 
@@ -726,10 +706,6 @@
                 }
             } catch(e){}
         }
-
-        window.addEventListener('pointerdown', () => initAudioContext(), { once: false });
-        window.addEventListener('touchstart', () => initAudioContext(), { once: false, passive: true });
-        window.addEventListener('mousedown', () => initAudioContext(), { once: false });
 
         let gameState = 'START';
         let score = 0;
@@ -796,7 +772,7 @@
         function handleJumpAction(e) {
             e.preventDefault();
             e.stopPropagation();
-            initAudioContext();
+            unlockAndPlayAudio();
             if (gameState === 'PLAYING') {
                 jump();
             }
@@ -805,7 +781,7 @@
         function handleDashStart(e) {
             e.preventDefault();
             e.stopPropagation();
-            initAudioContext();
+            unlockAndPlayAudio();
             if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) {
                 triggerDash(true);
                 btnDash.classList.add('touched');
@@ -858,7 +834,7 @@
         }
 
         function startGame() {
-            initAudioContext();
+            unlockAndPlayAudio();
             startBGM();
             gameState = 'PLAYING';
             score = 0; combo = 0; gameSpeed = 9;
@@ -883,7 +859,7 @@
         }
 
         function togglePause() {
-            initAudioContext();
+            unlockAndPlayAudio();
             if (gameState === 'PLAYING') {
                 gameState = 'PAUSED';
                 stopBGM();
