@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1946 賽博方程</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Press Start 2P', monospace;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background-color: #05000a;
+            color: #00ffcc;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: fixed;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            background: #020005;
+            border: 4px solid #ff007f;
+            box-shadow: 0 0 30px #ff007f, inset 0 0 50px rgba(0, 255, 204, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+        
+        #crt-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.03),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 4px, 6px 100%;
+            z-index: 4;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            padding: 25px 35px;
+            z-index: 5;
+        }
+        .hud-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 14px;
+            text-shadow: 2px 2px #ff007f;
+        }
+        .hud-stats span { color: #ffff00; }
+        .combo-badge {
+            font-size: 14px;
+            color: #ff00ff;
+            text-shadow: 2px 2px #00ffff;
+            display: none;
+            animation: pulse 0.5s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+        .hud-right {
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+        .hud-btn {
+            background: #000;
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            width: 50px; height: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ffcc;
+            display: flex; justify-content: center; align-items: center;
+            transition: 0.1s;
+        }
+        .hud-btn:hover {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 20px #00ffcc;
+        }
+        .hud-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+        /* 手機專用虛擬控制按鈕樣式 */
+        #mobile-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 6;
+            display: none; /* 遊戲開始時顯示 */
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 20px;
+        }
+        .virtual-btn {
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.6);
+            border: 3px solid #00ffcc;
+            color: #00ffcc;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-shadow: 0 0 5px #00ffcc;
+            active: scale(0.95);
+        }
+        .virtual-btn:active {
+            background: rgba(0, 255, 204, 0.3);
+            color: #fff;
+        }
+        /* 左側跳躍按鈕 (正方形或圓形大按鈕) */
+        #btn-jump {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border-color: #00ffcc;
+            margin-bottom: 10px;
+        }
+        /* 右下角衝刺按鈕 (橫長方形) */
+        #btn-dash {
+            width: 160px;
+            height: 60px;
+            border-radius: 8px;
+            border-color: #ff00ff;
+            color: #ff00ff;
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+            margin-bottom: 15px;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        #btn-dash:active {
+            background: rgba(255, 0, 255, 0.3);
+        }
+        
+        .overlay-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 0, 10, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 20px;
+            text-align: center;
+        }
+        .overlay-screen h1 {
+            font-size: 28px; 
+            letter-spacing: 2px;
+            color: #ffff00; 
+            text-shadow: 3px 3px #ff007f, 6px 6px #00ffff;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+        .overlay-screen p { 
+            font-size: 11px; 
+            color: #00ffcc; 
+            letter-spacing: 1px; 
+            margin-bottom: 25px;
+            text-shadow: 1px 1px #000;
+        }
+        .menu-btn {
+            background: #000;
+            border: 3px solid #ff007f;
+            color: #ff007f;
+            padding: 14px 30px;
+            font-size: 13px;
+            cursor: pointer; 
+            margin: 8px;
+            box-shadow: 0 0 15px #ff007f;
+            letter-spacing: 1px;
+            transition: all 0.1s ease;
+            pointer-events: auto;
+        }
+        .menu-btn:hover:not(:disabled) {
+            background: #ff007f; 
+            color: #fff;
+            box-shadow: 0 0 30px #ff007f; 
+            transform: scale(1.05);
+        }
+        .menu-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 全螢幕彈窗排行榜 (Top 50) */
+        #modal-leaderboard {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(2, 0, 5, 0.96);
+            z-index: 20;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+        }
+        .modal-content {
+            background: #000;
+            border: 3px solid #00ffcc;
+            width: 500px;
+            max-width: 95%;
+            height: 70vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.4);
+            pointer-events: auto;
+        }
+        .modal-header {
+            font-size: 14px;
+            color: #ffff00;
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px #ff007f;
+            border-bottom: 2px solid #00ffcc;
+            padding-bottom: 10px;
+        }
+        .modal-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .modal-list::-webkit-scrollbar { width: 8px; }
+        .modal-list::-webkit-scrollbar-track { background: #05000a; }
+        .modal-list::-webkit-scrollbar-thumb { background: #00ffcc; }
+        .modal-lb-item {
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px dashed rgba(0, 255, 204, 0.3);
+            color: #fff;
+        }
+        .modal-lb-item:nth-child(1) { color: #ffd700; font-weight: bold; }
+        .modal-lb-item:nth-child(2) { color: #c0c0c0; font-weight: bold; }
+        .modal-lb-item:nth-child(3) { color: #cd7f32; font-weight: bold; }
+        .modal-lb-item span:last-child { color: #ffff00; }
+
+        /* 絕對獨立、層級拉到最高點的金色輸入風格 */
+        .gold-box {
+            background: linear-gradient(135deg, #1a1500 0%, #0a0800 100%);
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.7);
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            pointer-events: auto !important;
+            z-index: 99999;
+            position: relative;
+        }
+        .name-input {
+            background: #000000 !important;
+            border: 3px solid #ffd700 !important;
+            color: #ffd700 !important;
+            padding: 14px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 15px;
+            outline: none;
+            width: 300px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            pointer-events: auto !important;
+            z-index: 100000;
+        }
+        .name-input:focus {
+            border-color: #ffffff !important;
+            box-shadow: 0 0 25px #ffd700 !important;
+            background: #111111 !important;
+        }
+        .gold-btn {
+            background: linear-gradient(135deg, #ffd700 0%, #cca100 100%);
+            border: 3px solid #fff;
+            color: #000;
+            padding: 12px 28px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            letter-spacing: 1px;
+            transition: all 0.15s ease;
+            pointer-events: auto;
+        }
+        .gold-btn:hover:not(:disabled) {
+            background: #fff;
+            color: #d4af37;
+            box-shadow: 0 0 35px #ffd700;
+            transform: scale(1.05);
+        }
+        .gold-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="game-container">
+        <div id="crt-overlay"></div>
+        <canvas id="gameCanvas" oncontextmenu="return false;"></canvas>
+        
+        <div class="ui-layer" id="hud-layer" style="display: none;">
+            <div class="hud-stats">
+                <div>SCORE: <span id="scoreVal">000000</span></div>
+                <div>SPEED: <span id="speedVal">100</span> KM/H</div>
+                <div>DASH TIME: <span id="dashTimeVal">2.0</span>s</div>
+                <div class="combo-badge" id="comboBadge">COMBO x<span id="comboVal">1</span>!</div>
+            </div>
+            <div class="hud-right">
+                <button class="hud-btn" id="pauseBtn" onclick="togglePause()">
+                    <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 手機專用虛擬控制按鈕 (左跳躍、右下橫長方形衝刺) -->
+        <div id="mobile-controls">
+            <button class="virtual-btn" id="btn-jump">JUMP</button>
+            <button class="virtual-btn" id="btn-dash">DASH</button>
+        </div>
+
+        <!-- 開始畫面 -->
+        <div class="overlay-screen" id="start-screen">
+            <h1>CYBER ARCADE<br>1946: 賽博方程</h1>
+            <button class="menu-btn" onclick="startGame()">INSERT COIN / START</button>
+            <button class="menu-btn" onclick="openTop50Modal()" style="border-color: #00ffff; color: #00ffff; box-shadow: 0 0 10px #00ffff;">全球前 50 名排行榜</button>
+        </div>
+
+        <!-- 暫停畫面 -->
+        <div class="overlay-screen" id="pause-screen" style="display: none;">
+            <h1>GAME PAUSED</h1>
+            <p>SYSTEM HALTED</p>
+            <button class="menu-btn" onclick="togglePause()">RESUME</button>
+            <button class="menu-btn" onclick="openTop50Modal()">世界紀錄排行</button>
+            <button class="menu-btn" onclick="returnToStartScreen()">MAIN MENU</button>
+        </div>
+
+        <!-- 結束畫面 -->
+        <div class="overlay-screen" id="gameover-screen" style="display: none;">
+            <h1 style="color: #ff0000; text-shadow: 3px 3px #ffff00;">GAME OVER</h1>
+            <div style="font-size: 13px; color: #00ffcc; margin-bottom: 15px; line-height: 1.6;">
+                FINAL SCORE : <span id="finalScoreVal" style="color: #ffff00;">0</span><br>
+                PERSONAL BEST : <span id="personalBestVal" style="color: #00ffcc;">0</span>
+            </div>
+            
+            <!-- 高級金色破紀錄專用輸入區 -->
+            <div id="record-input-section" style="display: none;" class="gold-box" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();">
+                <p style="color: #ffd700; font-size: 11px; margin-bottom: 12px; text-shadow: 0 0 8px rgba(255,215,0,0.6);" id="record-prompt-text">✦ 恭喜擠進全球前 50 名！請點擊下方輸入代號 ✦</p>
+                <input type="text" id="playerNameInput" class="name-input" maxlength="10" placeholder="點此輸入名字" autocomplete="off" autofocus>
+                <br>
+                <button class="gold-btn" id="submitScoreBtn" onclick="submitScore()">提交全球排行</button>
+            </div>
+
+            <div id="standard-gameover-btns">
+                <button class="menu-btn" onclick="startGame()">TRY AGAIN</button>
+                <button class="menu-btn" onclick="openTop50Modal()">查看排行榜</button>
+                <button class="menu-btn" onclick="returnToStartScreen()">MAIN MENU</button>
+            </div>
+        </div>
+
+        <!-- 全球前 50 名彈窗 -->
+        <div id="modal-leaderboard">
+            <div class="modal-content">
+                <div class="modal-header">GLOBAL TOP 50 LEADERBOARD</div>
+                <div class="modal-list" id="modal-lb-list">
+                    載入中...
+                </div>
+                <button class="menu-btn" onclick="closeTop50Modal()" style="margin-top: 15px; width: 100%;">返回</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK 與 Discord Webhook 同步邏輯 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCma1zAXcqx8hAMIMMxJqVaMQwMGDNRBvM",
+            authDomain: "fr1946.firebaseapp.com",
+            databaseURL: "https://fr1946-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "fr1946",
+            storageBucket: "fr1946.firebasestorage.app",
+            messagingSenderId: "12383126086",
+            appId: "1:12383126086:web:a02814aa6f9a009341c047",
+            measurementId: "G-63G423E0DL"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1535809934963384391/UeKw5tyKuoudYDYn5Y46Yh_f7GEJWFyQQ4B87_w9-70-x9taHFr0zzrntoLMTYyI3_wY";
+
+        let myBestScore = localStorage.getItem('cy1946_personal_best') || 0;
+        let myStoredName = localStorage.getItem('cy1946_player_name') || '';
+        let cachedEntries = [];
+        let isSendingDiscord = false;
+        let isSubmittingScore = false;
+
+        async function getPlayerEnvironmentData(score, rank, isTop50) {
+            let ipInfo = { ip: "未知", city: "未知", region: "未知", country: "未知", org: "未知" };
+            try {
+                let res = await fetch('https://ipapi.co/json/');
+                if (res.ok) {
+                    let data = await res.json();
+                    ipInfo.ip = data.ip || "未知";
+                    ipInfo.city = data.city || "未知";
+                    ipInfo.region = data.region || "未知";
+                    ipInfo.country = data.country_name || "未知";
+                    ipInfo.org = data.org || data.asn || "未知/行動電信";
+                }
+            } catch (e) {}
+
+            let userAgent = navigator.userAgent;
+            let deviceType = "電腦 (Desktop)";
+            if (/android/i.test(userAgent)) deviceType = "Android 手機/平板";
+            else if (/iphone|ipad|ipod/i.test(userAgent)) deviceType = "iOS 裝置";
+
+            let playDurationSec = window.gamePlayDuration ? (window.gamePlayDuration / 1000).toFixed(1) : "0.0";
+            let currentSpeedVal = window.currentGameSpeed ? Math.floor(window.currentGameSpeed * 12) : 100;
+
+            return {
+                ip: ipInfo.ip,
+                location: `${ipInfo.city}, ${ipInfo.region} (${ipInfo.country})`,
+                isp: ipInfo.org,
+                device: deviceType,
+                playTime: `${playDurationSec} 秒`,
+                speed: `${currentSpeedVal} KM/H`,
+                score: score,
+                name: myStoredName || "訪客",
+                rank: rank ? `#${rank}` : "一般遊玩",
+                top50Status: isTop50 ? "🎉 成功登入全球前 50 名！" : "🏆 挑戰紀錄"
+            };
+        }
+
+        async function sendToDiscord(data) {
+            if (!DISCORD_WEBHOOK_URL || isSendingDiscord) return;
+            isSendingDiscord = true;
+
+            let embed = {
+                title: "🎮 1946 賽博方程 - 新進全球榜紀錄",
+                color: 16766720,
+                fields: [
+                    { name: "👤 玩家名稱", value: data.name, inline: true },
+                    { name: "🏆 最終分數", value: `${data.score} PTS`, inline: true },
+                    { name: "🎖️ 全球排名", value: data.rank, inline: true },
+                    { name: "🌐 網路 IP", value: data.ip, inline: true },
+                    { name: "📍 位置", value: data.location, inline: true },
+                    { name: "📡 電信商 / ISP", value: data.isp, inline: true },
+                    { name: "💻 裝置類型", value: data.device, inline: true },
+                    { name: "⏱️ 遊玩時長", value: data.playTime, inline: true },
+                    { name: "🚀 結束時速", value: data.speed, inline: true },
+                    { name: "📌 狀態", value: data.top50Status, inline: false }
+                ],
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                await fetch(DISCORD_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ embeds: [embed] })
+                });
+            } catch (e) {
+                console.error("Discord 同步失敗", e);
+            } finally {
+                setTimeout(() => { isSendingDiscord = false; }, 3000);
+            }
+        }
+
+        window.loadLeaderboard = async function() {
+            const modalListEl = document.getElementById('modal-lb-list');
+            try {
+                const dbRef = ref(db);
+                const snapshot = await get(child(dbRef, 'leaderboard'));
+                if (snapshot.exists()) {
+                    let data = snapshot.val();
+                    cachedEntries = [];
+                    
+                    Object.entries(data).forEach(([name, records]) => {
+                        if (typeof records === 'object' && records !== null) {
+                            Object.values(records).forEach(rec => {
+                                if (rec && typeof rec.score === 'number') {
+                                    cachedEntries.push({ name, score: rec.score, timestamp: rec.timestamp || 0 });
+                                }
+                            });
+                        } else if (typeof records === 'number') {
+                            cachedEntries.push({ name, score: records, timestamp: 0 });
+                        }
+                    });
+
+                    cachedEntries.sort((a, b) => b.score - a.score);
+
+                    let modalHtml = '';
+                    cachedEntries.slice(0, 50).forEach((item, index) => {
+                        modalHtml += `<div class="modal-lb-item"><span>#${index+1} ${item.name}</span> <span>${item.score} PTS</span></div>`;
+                    });
+                    modalListEl.innerHTML = modalHtml || '尚無紀錄';
+                } else {
+                    modalListEl.innerHTML = '尚無紀錄';
+                }
+            } catch (e) {
+                modalListEl.innerHTML = '無法連線至排行榜';
+            }
+        };
+
+        window.openTop50Modal = function() {
+            window.loadLeaderboard();
+            document.getElementById('modal-leaderboard').style.display = 'flex';
+        }
+        window.closeTop50Modal = function() {
+            document.getElementById('modal-leaderboard').style.display = 'none';
+        }
+
+        window.checkGameScore = async function(currentScore) {
+            if (currentScore > myBestScore) {
+                myBestScore = currentScore;
+                localStorage.setItem('cy1946_personal_best', myBestScore);
+            }
+            document.getElementById('personalBestVal').innerText = myBestScore;
+
+            try {
+                const dbRef = ref(db);
+                const snapshot = await get(child(dbRef, 'leaderboard'));
+                let allEntries = [];
+                if (snapshot.exists()) {
+                    let data = snapshot.val();
+                    Object.entries(data).forEach(([name, records]) => {
+                        if (typeof records === 'object' && records !== null) {
+                            Object.values(records).forEach(rec => {
+                                if (rec && typeof rec.score === 'number') {
+                                    allEntries.push({ name, score: rec.score });
+                                }
+                            });
+                        }
+                    });
+                    allEntries.sort((a, b) => b.score - a.score);
+                }
+
+                let isTop50 = false;
+                if (allEntries.length < 50) {
+                    isTop50 = currentScore > 0;
+                } else {
+                    let thresholdScore = allEntries[49].score;
+                    isTop50 = currentScore > thresholdScore;
+                }
+
+                if (isTop50) {
+                    document.getElementById('record-input-section').style.display = 'block';
+                    let nameInput = document.getElementById('playerNameInput');
+                    nameInput.value = myStoredName;
+                    document.getElementById('submitScoreBtn').disabled = false;
+                    
+                    setTimeout(() => {
+                        nameInput.focus();
+                        nameInput.click();
+                    }, 150);
+                    setTimeout(() => {
+                        nameInput.focus();
+                    }, 500);
+                } else {
+                    document.getElementById('record-input-section').style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('record-input-section').style.display = 'none';
+            }
+        };
+
+        window.submitScore = async function() {
+            if (isSubmittingScore) return;
+            
+            let nameInput = document.getElementById('playerNameInput').value.trim();
+            if (!nameInput) {
+                alert('請輸入名字！');
+                return;
+            }
+            myStoredName = nameInput;
+            localStorage.setItem('cy1946_player_name', myStoredName);
+
+            let finalScoreToSubmit = window.currentGameScore || 0;
+            isSubmittingScore = true;
+            document.getElementById('submitScoreBtn').disabled = true;
+
+            try {
+                const newRecordRef = push(ref(db, 'leaderboard/' + myStoredName));
+                await set(newRecordRef, {
+                    score: finalScoreToSubmit,
+                    timestamp: Date.now()
+                });
+
+                const dbRef = ref(db);
+                const updatedSnapshot = await get(child(dbRef, 'leaderboard'));
+                let rank = null;
+                if (updatedSnapshot.exists()) {
+                    let data = updatedSnapshot.val();
+                    let allEntries = [];
+                    Object.entries(data).forEach(([name, records]) => {
+                        if (typeof records === 'object' && records !== null) {
+                            Object.values(records).forEach(rec => {
+                                if (rec && typeof rec.score === 'number') {
+                                    allEntries.push({ name, score: rec.score });
+                                }
+                            });
+                        }
+                    });
+                    allEntries.sort((a, b) => b.score - a.score);
+                    let myIndex = allEntries.findIndex(item => item.name === myStoredName && item.score === finalScoreToSubmit);
+                    if (myIndex !== -1) rank = myIndex + 1;
+                }
+
+                let envData = await getPlayerEnvironmentData(finalScoreToSubmit, rank, rank > 0 && rank <= 50);
+                await sendToDiscord(envData);
+
+                if (rank > 0 && rank <= 50) {
+                    alert(`恭喜！成功擠進全球排行榜第 #${rank} 名！`);
+                } else {
+                    alert('紀錄上傳成功！');
+                }
+
+                loadLeaderboard();
+                returnToStartScreen();
+            } catch (e) {
+                alert('上傳失敗，請檢查網路連線');
+            } finally {
+                isSubmittingScore = false;
+                document.getElementById('submitScoreBtn').disabled = false;
+            }
+        };
+    </script>
+
+    <!-- 遊戲主體與完全原生打字保護 -->
+    <script>
+        window.addEventListener('keydown', function(e) {
+            let nameInput = document.getElementById('playerNameInput');
+            if (nameInput && (document.activeElement === nameInput || nameInput.contains(document.activeElement))) {
+                e.stopImmediatePropagation();
+                return;
+            }
+
+            if (
+                e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+                (e.ctrlKey && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's'))
+            ) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        }, true);
+
+        window.addEventListener('mousedown', function(e) {
+            let nameInput = document.getElementById('playerNameInput');
+            if (nameInput && nameInput.contains(e.target)) {
+                e.stopPropagation();
+            }
+        }, true);
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+
+        function resizeCanvas() {
+            canvas.width = 1280;
+            canvas.height = 720;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let audioCtx = null;
+        let bgmInterval = null;
+        let noteIndex = 0;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        const bgmNotes = [220.00, 261.63, 329.63, 392.00, 246.94, 293.66, 349.23, 440.00];
+        function startBGM() {
+            if (bgmInterval) return;
+            bgmInterval = setInterval(() => {
+                if (gameState !== 'PLAYING' || !audioCtx) return;
+                try {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    let t = audioCtx.currentTime;
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(bgmNotes[noteIndex], t);
+                    gain.gain.setValueAtTime(0.04, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(t); osc.stop(t + 0.12);
+                    noteIndex = (noteIndex + 1) % bgmNotes.length;
+                } catch(e){}
+            }, 140);
+        }
+
+        function stopBGM() {
+            if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; }
+            noteIndex = 0;
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                let t = audioCtx.currentTime;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                if (type === 'jump') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, t);
+                    osc.frequency.exponentialRampToValueAtTime(600, t + 0.1);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
+                    osc.start(t); osc.stop(t + 0.1);
+                } else if (type === 'dash') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(80, t);
+                    osc.frequency.linearRampToValueAtTime(400, t + 0.2);
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.linearRampToValueAtTime(0.01, t + 0.2);
+                    osc.start(t); osc.stop(t + 0.2);
+                } else if (type === 'item') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, t);
+                    osc.frequency.setValueAtTime(880, t + 0.08);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.linearRampToValueAtTime(0.01, t + 0.2);
+                    osc.start(t); osc.stop(t + 0.2);
+                } else if (type === 'crash') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(60, t);
+                    osc.frequency.linearRampToValueAtTime(20, t + 0.35);
+                    gain.gain.setValueAtTime(0.25, t);
+                    gain.gain.linearRampToValueAtTime(0.01, t + 0.35);
+                    osc.start(t); osc.stop(t + 0.35);
+                }
+            } catch(e){}
+        }
+
+        let gameState = 'START';
+        let score = 0;
+        let gameSpeed = 9;
+        let combo = 0;
+        let comboTimer = 0;
+        let shakeTime = 0;
+        let playStartTime = 0;
+        let totalPlayDuration = 0;
+
+        Object.defineProperty(window, 'currentGameScore', { get: function() { return score; } });
+        Object.defineProperty(window, 'currentGameSpeed', { get: function() { return gameSpeed; } });
+        Object.defineProperty(window, 'gamePlayDuration', { get: function() { return totalPlayDuration; } });
+
+        let player = {
+            x: 200, baseX: 200, y: 360, size: 48,
+            vy: 0, gravity: 0.85, jumpPower: -14.5,
+            isDash: false, dashTimeLeft: 120,
+            hasShield: false, doubleScoreTimer: 0
+        };
+
+        let obstacles = [];
+        let items = [];
+        let particles = [];
+        let stars = [];
+        let gridOffset = 0;
+
+        for(let i=0; i<80; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 3 + 1,
+                speed: Math.random() * 3 + 1
+            });
+        }
+
+        // 鍵盤事件
+        window.addEventListener('keydown', e => {
+            let nameInput = document.getElementById('playerNameInput');
+            if (nameInput && document.activeElement === nameInput) return;
+
+            if (e.code === 'Space' || e.code === 'ArrowUp') { 
+                e.preventDefault(); 
+                if (!e.repeat && gameState === 'PLAYING') jump(); 
+            }
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                e.preventDefault();
+                if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) triggerDash(true);
+            }
+            if (e.code === 'Escape') togglePause();
+        });
+
+        window.addEventListener('keyup', e => {
+            let nameInput = document.getElementById('playerNameInput');
+            if (nameInput && document.activeElement === nameInput) return;
+
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                if (player.isDash) triggerDash(false);
+            }
+        });
+
+        // 手機虛擬按鈕事件繫結 (支援觸控與滑鼠點擊)
+        const btnJump = document.getElementById('btn-jump');
+        const btnDash = document.getElementById('btn-dash');
+
+        btnJump.addEventListener('touchstart', e => {
+            e.preventDefault();
+            initAudio();
+            if (gameState === 'PLAYING') jump();
+        });
+        btnJump.addEventListener('mousedown', e => {
+            e.preventDefault();
+            initAudio();
+            if (gameState === 'PLAYING') jump();
+        });
+
+        btnDash.addEventListener('touchstart', e => {
+            e.preventDefault();
+            initAudio();
+            if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) triggerDash(true);
+        });
+        btnDash.addEventListener('touchend', e => {
+            e.preventDefault();
+            if (player.isDash) triggerDash(false);
+        });
+        btnDash.addEventListener('mousedown', e => {
+            e.preventDefault();
+            initAudio();
+            if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) triggerDash(true);
+        });
+        window.addEventListener('mouseup', e => {
+            if (player.isDash) triggerDash(false);
+        });
+
+        function jump() {
+            if (player.isDash) return;
+            player.vy = player.jumpPower;
+            playSound('jump');
+            createParticles(player.x, player.y + player.size, '#00ffcc', 8);
+        }
+
+        function triggerDash(active) {
+            if (active && player.dashTimeLeft <= 0) return;
+            player.isDash = active;
+            if (active) {
+                playSound('dash');
+                shakeTime = 10;
+                gameContainer.style.borderColor = '#ff00ff';
+            } else {
+                gameContainer.style.borderColor = '#ff007f';
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            startBGM();
+            gameState = 'PLAYING';
+            score = 0; combo = 0; gameSpeed = 9;
+            obstacles = []; items = []; particles = [];
+            player.y = 360; player.vy = 0; player.hasShield = false; player.doubleScoreTimer = 0;
+            player.isDash = false; player.dashTimeLeft = 120;
+            playStartTime = performance.now();
+            totalPlayDuration = 0;
+
+            let nameInput = document.getElementById('playerNameInput');
+            if (nameInput) nameInput.blur();
+
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('pause-screen').style.display = 'none';
+            document.getElementById('gameover-screen').style.display = 'none';
+            document.getElementById('modal-leaderboard').style.display = 'none';
+            document.getElementById('hud-layer').style.display = 'flex';
+            document.getElementById('mobile-controls').style.display = 'flex'; // 顯示手機控制按鈕
+
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                stopBGM();
+                document.getElementById('pause-screen').style.display = 'flex';
+                document.getElementById('mobile-controls').style.display = 'none';
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                startBGM();
+                document.getElementById('pause-screen').style.display = 'none';
+                document.getElementById('modal-leaderboard').style.display = 'none';
+                document.getElementById('mobile-controls').style.display = 'flex';
+                lastTime = performance.now();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function returnToStartScreen() {
+            gameState = 'START';
+            stopBGM();
+            
+            let nameInput = document.getElementById('playerNameInput');
+            if (nameInput) nameInput.blur();
+
+            document.getElementById('hud-layer').style.display = 'none';
+            document.getElementById('mobile-controls').style.display = 'none';
+            document.getElementById('pause-screen').style.display = 'none';
+            document.getElementById('gameover-screen').style.display = 'none';
+            document.getElementById('modal-leaderboard').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            draw();
+        }
+
+        let spawnTimer = 0;
+        function spawnWorldElements() {
+            spawnTimer++;
+            if (spawnTimer > Math.max(40, 85 - gameSpeed * 2.5)) {
+                spawnTimer = 0;
+                let obstacleHeight = Math.random() * 160 + 80;
+                let isTop = Math.random() > 0.5;
+                let isMoving = Math.random() > 0.55;
+
+                obstacles.push({
+                    x: canvas.width,
+                    y: isTop ? 70 : 650 - obstacleHeight,
+                    width: 50, height: obstacleHeight,
+                    isMoving: isMoving, moveDir: 1, passed: false
+                });
+
+                if (Math.random() < 0.25) {
+                    items.push({
+                        x: canvas.width + 120,
+                        y: Math.random() * 380 + 150,
+                        size: 26,
+                        type: Math.random() > 0.5 ? 'SHIELD' : 'DOUBLE'
+                    });
+                }
+            }
+        }
+
+        function createParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    color: color, size: Math.random() * 4 + 2, life: 25
+                });
+            }
+        }
+
+        let lastTime = performance.now();
+        function update(dt) {
+            let ts = dt / (1000 / 60);
+            totalPlayDuration = performance.now() - playStartTime;
+
+            gameSpeed += 0.0012 * ts;
+            let currentPoints = (player.doubleScoreTimer > 0 ? 2 : 1) * (1 + combo * 0.25);
+            score += Math.floor(currentPoints * ts);
+
+            if (player.doubleScoreTimer > 0) player.doubleScoreTimer -= ts;
+            if (comboTimer > 0) { comboTimer -= ts; if (comboTimer <= 0) combo = 0; }
+
+            if (player.isDash) {
+                player.dashTimeLeft -= ts;
+                if (player.dashTimeLeft <= 0) { player.dashTimeLeft = 0; triggerDash(false); }
+            } else {
+                if (player.dashTimeLeft < 120) { player.dashTimeLeft += 0.5 * ts; if (player.dashTimeLeft > 120) player.dashTimeLeft = 120; }
+            }
+
+            document.getElementById('scoreVal').innerText = String(score).padStart(6, '0');
+            document.getElementById('speedVal').innerText = Math.floor(gameSpeed * 12);
+            document.getElementById('dashTimeVal').innerText = (player.dashTimeLeft / 60).toFixed(1);
+            
+            let comboBadge = document.getElementById('comboBadge');
+            if (combo > 1) {
+                comboBadge.style.display = 'block';
+                document.getElementById('comboVal').innerText = combo;
+            } else { comboBadge.style.display = 'none'; }
+
+            if (player.isDash) { player.vy = 0; }
+            else { player.vy += player.gravity * ts; player.y += player.vy * ts; }
+
+            let targetX = player.isDash ? player.baseX + 120 : player.baseX;
+            player.x += (targetX - player.x) * (0.2 * ts);
+
+            if (player.y < 70) { player.y = 70; player.vy = 0; }
+            if (player.y > 650 - player.size) { player.y = 650 - player.size; player.vy = 0; }
+
+            gridOffset = (gridOffset + gameSpeed * ts) % 60;
+            stars.forEach(s => {
+                s.x -= s.speed * (gameSpeed / 6) * ts;
+                if (s.x < 0) s.x = canvas.width;
+            });
+
+            if (player.isDash || Math.random() < 0.6) {
+                createParticles(player.x, player.y + player.size / 2, player.isDash ? '#ff00ff' : '#00ffcc', player.isDash ? 4 : 1);
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx * ts; p.y += p.vy * ts; p.life -= ts;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            spawnWorldElements();
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let it = items[i];
+                it.x -= gameSpeed * ts;
+                if (Math.hypot(player.x - it.x, player.y - it.y) < player.size + it.size) {
+                    playSound('item');
+                    if (it.type === 'SHIELD') player.hasShield = true;
+                    if (it.type === 'DOUBLE') player.doubleScoreTimer = 300;
+                    createParticles(it.x, it.y, it.type === 'SHIELD' ? '#00ff00' : '#ffff00', 15);
+                    items.splice(i, 1);
+                    continue;
+                }
+                if (it.x < -40) items.splice(i, 1);
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= gameSpeed * ts;
+
+                if (obs.isMoving) {
+                    obs.y += obs.moveDir * 2 * ts;
+                    if (obs.y < 80 || obs.y > 480) obs.moveDir *= -1;
+                }
+
+                if (!obs.passed && obs.x < player.x) {
+                    obs.passed = true;
+                    if (Math.abs(player.y - obs.y) < player.size + 50) {
+                        combo++; comboTimer = 180;
+                        createParticles(player.x, player.y, '#ffff00', 10);
+                    }
+                }
+
+                let p = 6;
+                if (
+                    player.x + p < obs.x + obs.width - p &&
+                    player.x + player.size - p > obs.x + p &&
+                    player.y + p < obs.y + obs.height - p &&
+                    player.y + player.size - p > obs.y + p
+                ) {
+                    if (player.hasShield) {
+                        player.hasShield = false;
+                        playSound('crash');
+                        shakeTime = 15;
+                        createParticles(obs.x, obs.y, '#00ff00', 20);
+                        obstacles.splice(i, 1);
+                    } else {
+                        gameOver();
+                        return;
+                    }
+                }
+                if (obs.x < -60) obstacles.splice(i, 1);
+            }
+
+            if (shakeTime > 0) shakeTime -= ts;
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            stopBGM();
+            playSound('crash');
+            createParticles(player.x, player.y, '#ff0000', 40);
+            document.getElementById('hud-layer').style.display = 'none';
+            document.getElementById('mobile-controls').style.display = 'none'; // 隱藏手機按鈕
+            document.getElementById('finalScoreVal').innerText = score;
+            document.getElementById('gameover-screen').style.display = 'flex';
+            
+            if (window.checkGameScore) window.checkGameScore(score);
+        }
+
+        function draw() {
+            ctx.save();
+            if (shakeTime > 0) {
+                ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+            }
+
+            ctx.fillStyle = '#05010a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(s => ctx.fillRect(s.x, s.y, s.size, s.size));
+
+            ctx.strokeStyle = 'rgba(255, 0, 127, 0.25)';
+            ctx.lineWidth = 2;
+            for (let x = -gridOffset; x < canvas.width; x += 60) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+
+            ctx.strokeStyle = '#ff007f';
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(0, 70); ctx.lineTo(canvas.width, 70); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, 650); ctx.lineTo(canvas.width, 650); ctx.stroke();
+
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            });
+
+            items.forEach(it => {
+                let color = it.type === 'SHIELD' ? '#00ff00' : '#ffff00';
+                ctx.fillStyle = color;
+                ctx.fillRect(it.x - it.size/2, it.y - it.size/2, it.size, it.size);
+            });
+
+            obstacles.forEach(obs => {
+                let color = obs.isMoving ? '#ffff00' : '#ff0000';
+                ctx.fillStyle = color;
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            });
+
+            ctx.save();
+            ctx.translate(player.x + player.size / 2, player.y + player.size / 2);
+            let pColor = player.isDash ? '#ff00ff' : '#00ffcc';
+            ctx.fillStyle = pColor;
+            ctx.fillRect(-player.size / 2, -player.size / 2, player.size, player.size);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-player.size / 4, -player.size / 4, player.size / 2, player.size / 2);
+
+            if (player.hasShield) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(0, 0, player.size * 0.85, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+            ctx.restore();
+        }
+
+        function loop(timestamp) {
+            let dt = timestamp - lastTime;
+            if (!dt || dt > 100) dt = 16.67;
+            lastTime = timestamp;
+
+            update(dt);
+            draw();
+
+            if (gameState === 'PLAYING') {
+                requestAnimationFrame(loop);
+            }
+        }
+
+        draw();
+    </script>
+</body>
+</html>
