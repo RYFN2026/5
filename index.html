@@ -115,7 +115,7 @@
         }
         .hud-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-        /* 手機專用虛擬控制按鈕樣式 (加大版) */
+        /* 手機專用虛擬控制按鈕：全部改為橫向長方形，位置更靠下方 */
         #mobile-controls {
             position: absolute;
             top: 0;
@@ -127,11 +127,11 @@
             display: none; 
             justify-content: space-between;
             align-items: flex-end;
-            padding: 25px;
+            padding: 15px 25px; /* 更加靠下 */
         }
         .virtual-btn {
             pointer-events: auto !important;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             border: 3px solid #00ffcc;
             color: #00ffcc;
             font-size: 16px;
@@ -142,30 +142,27 @@
             align-items: center;
             text-shadow: 0 0 8px #00ffcc;
             cursor: pointer;
+            border-radius: 12px; /* 統一改為矩形帶圓角，絕非圓形 */
+            margin-bottom: 10px;
         }
         .virtual-btn:active, .virtual-btn.touched {
             background: rgba(0, 255, 204, 0.4);
             color: #fff;
         }
-        /* 左側跳躍按鈕 (加大) */
+        /* 左側跳躍按鈕：橫向長方形、位置下移 */
         #btn-jump {
-            width: 130px;
-            height: 130px;
-            border-radius: 50%;
-            border-color: #00ffcc;
-            margin-bottom: 10px;
-            font-size: 20px;
-        }
-        /* 右下角衝刺按鈕 (橫長方形、加大加寬) */
-        #btn-dash {
-            width: 200px;
+            width: 180px;
             height: 75px;
-            border-radius: 12px;
+            border-color: #00ffcc;
+            letter-spacing: 2px;
+        }
+        /* 右側衝刺按鈕：橫向長方形、位置下移 */
+        #btn-dash {
+            width: 180px;
+            height: 75px;
             border-color: #ff00ff;
             color: #ff00ff;
             box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
-            margin-bottom: 15px;
-            font-size: 18px;
             letter-spacing: 2px;
             text-shadow: 0 0 8px #ff00ff;
         }
@@ -279,7 +276,6 @@
         .modal-lb-item:nth-child(3) { color: #cd7f32; font-weight: bold; }
         .modal-lb-item span:last-child { color: #ffff00; }
 
-        /* 絕對獨立、層級拉到最高點的金色輸入風格 */
         .gold-box {
             background: linear-gradient(135deg, #1a1500 0%, #0a0800 100%);
             border: 3px solid #ffd700;
@@ -307,11 +303,6 @@
             pointer-events: auto !important;
             z-index: 100000;
         }
-        .name-input:focus {
-            border-color: #ffffff !important;
-            box-shadow: 0 0 25px #ffd700 !important;
-            background: #111111 !important;
-        }
         .gold-btn {
             background: linear-gradient(135deg, #ffd700 0%, #cca100 100%);
             border: 3px solid #fff;
@@ -324,16 +315,6 @@
             letter-spacing: 1px;
             transition: all 0.15s ease;
             pointer-events: auto;
-        }
-        .gold-btn:hover:not(:disabled) {
-            background: #fff;
-            color: #d4af37;
-            box-shadow: 0 0 35px #ffd700;
-            transform: scale(1.05);
-        }
-        .gold-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
         }
     </style>
 </head>
@@ -357,7 +338,7 @@
             </div>
         </div>
 
-        <!-- 手機專用虛擬控制按鈕 (左跳躍、右下橫長方形衝刺) -->
+        <!-- 手機專用虛擬控制按鈕 (橫向長方形，位置更靠下方) -->
         <div id="mobile-controls">
             <button class="virtual-btn" id="btn-jump">JUMP</button>
             <button class="virtual-btn" id="btn-dash">DASH</button>
@@ -387,7 +368,6 @@
                 PERSONAL BEST : <span id="personalBestVal" style="color: #00ffcc;">0</span>
             </div>
             
-            <!-- 高級金色破紀錄專用輸入區 -->
             <div id="record-input-section" style="display: none;" class="gold-box" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();">
                 <p style="color: #ffd700; font-size: 11px; margin-bottom: 12px; text-shadow: 0 0 8px rgba(255,215,0,0.6);" id="record-prompt-text">✦ 恭喜擠進全球前 50 名！請點擊下方輸入代號 ✦</p>
                 <input type="text" id="playerNameInput" class="name-input" maxlength="10" placeholder="點此輸入名字" autocomplete="off" autofocus>
@@ -432,7 +412,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-
         const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1535809934963384391/UeKw5tyKuoudYDYn5Y46Yh_f7GEJWFyQQ4B87_w9-70-x9taHFr0zzrntoLMTYyI3_wY";
 
         let myBestScore = localStorage.getItem('cy1946_personal_best') || 0;
@@ -505,9 +484,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ embeds: [embed] })
                 });
-            } catch (e) {
-                console.error("Discord 同步失敗", e);
-            } finally {
+            } catch (e) {} finally {
                 setTimeout(() => { isSendingDiscord = false; }, 3000);
             }
         }
@@ -528,13 +505,10 @@
                                     cachedEntries.push({ name, score: rec.score, timestamp: rec.timestamp || 0 });
                                 }
                             });
-                        } else if (typeof records === 'number') {
-                            cachedEntries.push({ name, score: records, timestamp: 0 });
                         }
                     });
 
                     cachedEntries.sort((a, b) => b.score - a.score);
-
                     let modalHtml = '';
                     cachedEntries.slice(0, 50).forEach((item, index) => {
                         modalHtml += `<div class="modal-lb-item"><span>#${index+1} ${item.name}</span> <span>${item.score} PTS</span></div>`;
@@ -581,27 +555,13 @@
                     allEntries.sort((a, b) => b.score - a.score);
                 }
 
-                let isTop50 = false;
-                if (allEntries.length < 50) {
-                    isTop50 = currentScore > 0;
-                } else {
-                    let thresholdScore = allEntries[49].score;
-                    isTop50 = currentScore > thresholdScore;
-                }
-
+                let isTop50 = allEntries.length < 50 ? (currentScore > 0) : (currentScore > allEntries[49].score);
                 if (isTop50) {
                     document.getElementById('record-input-section').style.display = 'block';
                     let nameInput = document.getElementById('playerNameInput');
                     nameInput.value = myStoredName;
                     document.getElementById('submitScoreBtn').disabled = false;
-                    
-                    setTimeout(() => {
-                        nameInput.focus();
-                        nameInput.click();
-                    }, 150);
-                    setTimeout(() => {
-                        nameInput.focus();
-                    }, 500);
+                    setTimeout(() => { nameInput.focus(); nameInput.click(); }, 150);
                 } else {
                     document.getElementById('record-input-section').style.display = 'none';
                 }
@@ -612,12 +572,8 @@
 
         window.submitScore = async function() {
             if (isSubmittingScore) return;
-            
             let nameInput = document.getElementById('playerNameInput').value.trim();
-            if (!nameInput) {
-                alert('請輸入名字！');
-                return;
-            }
+            if (!nameInput) { alert('請輸入名字！'); return; }
             myStoredName = nameInput;
             localStorage.setItem('cy1946_player_name', myStoredName);
 
@@ -627,13 +583,9 @@
 
             try {
                 const newRecordRef = push(ref(db, 'leaderboard/' + myStoredName));
-                await set(newRecordRef, {
-                    score: finalScoreToSubmit,
-                    timestamp: Date.now()
-                });
+                await set(newRecordRef, { score: finalScoreToSubmit, timestamp: Date.now() });
 
-                const dbRef = ref(db);
-                const updatedSnapshot = await get(child(dbRef, 'leaderboard'));
+                const updatedSnapshot = await get(child(ref(db), 'leaderboard'));
                 let rank = null;
                 if (updatedSnapshot.exists()) {
                     let data = updatedSnapshot.val();
@@ -641,9 +593,7 @@
                     Object.entries(data).forEach(([name, records]) => {
                         if (typeof records === 'object' && records !== null) {
                             Object.values(records).forEach(rec => {
-                                if (rec && typeof rec.score === 'number') {
-                                    allEntries.push({ name, score: rec.score });
-                                }
+                                if (rec && typeof rec.score === 'number') allEntries.push({ name, score: rec.score });
                             });
                         }
                     });
@@ -654,13 +604,7 @@
 
                 let envData = await getPlayerEnvironmentData(finalScoreToSubmit, rank, rank > 0 && rank <= 50);
                 await sendToDiscord(envData);
-
-                if (rank > 0 && rank <= 50) {
-                    alert(`恭喜！成功擠進全球排行榜第 #${rank} 名！`);
-                } else {
-                    alert('紀錄上傳成功！');
-                }
-
+                alert(rank > 0 && rank <= 50 ? `恭喜！成功擠進全球排行榜第 #${rank} 名！` : '紀錄上傳成功！');
                 loadLeaderboard();
                 returnToStartScreen();
             } catch (e) {
@@ -672,33 +616,8 @@
         };
     </script>
 
-    <!-- 遊戲主體與修復橫屏觸控邏輯 -->
+    <!-- 遊戲主體與強化版控制/音效機制 -->
     <script>
-        window.addEventListener('keydown', function(e) {
-            let nameInput = document.getElementById('playerNameInput');
-            if (nameInput && (document.activeElement === nameInput || nameInput.contains(document.activeElement))) {
-                e.stopImmediatePropagation();
-                return;
-            }
-
-            if (
-                e.key === 'F12' || 
-                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
-                (e.ctrlKey && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's'))
-            ) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }
-        }, true);
-
-        window.addEventListener('mousedown', function(e) {
-            let nameInput = document.getElementById('playerNameInput');
-            if (nameInput && nameInput.contains(e.target)) {
-                e.stopPropagation();
-            }
-        }, true);
-
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const gameContainer = document.getElementById('game-container');
@@ -746,6 +665,7 @@
         }
 
         function playSound(type) {
+            initAudio();
             if (!audioCtx) return;
             try {
                 let osc = audioCtx.createOscillator();
@@ -844,7 +764,7 @@
             }
         });
 
-        // 徹底修復橫屏與各型手機觸控不靈敏 / 無法按壓問題
+        // 徹底修復觸控事件，支援連續點擊與長方形觸控判定
         const btnJump = document.getElementById('btn-jump');
         const btnDash = document.getElementById('btn-dash');
 
@@ -874,12 +794,16 @@
             }
         }
 
+        // 綁定多重觸控與指標事件，確保完全不卡頓、不失效
         btnJump.addEventListener('touchstart', handleJumpStart, { passive: false });
+        btnJump.addEventListener('pointerdown', handleJumpStart);
         btnJump.addEventListener('mousedown', handleJumpStart);
 
         btnDash.addEventListener('touchstart', handleDashStart, { passive: false });
         btnDash.addEventListener('touchend', handleDashEnd, { passive: false });
         btnDash.addEventListener('touchcancel', handleDashEnd, { passive: false });
+        btnDash.addEventListener('pointerdown', handleDashStart);
+        btnDash.addEventListener('pointerup', handleDashEnd);
         btnDash.addEventListener('mousedown', handleDashStart);
         window.addEventListener('mouseup', () => {
             if (player.isDash) {
@@ -952,7 +876,6 @@
         function returnToStartScreen() {
             gameState = 'START';
             stopBGM();
-            
             let nameInput = document.getElementById('playerNameInput');
             if (nameInput) nameInput.blur();
 
