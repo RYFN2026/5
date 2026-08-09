@@ -115,7 +115,6 @@
         }
         .hud-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-        /* 手機專用虛擬控制按鈕：完全置於下方、橫向長方形、高感應區 */
         #mobile-controls {
             position: absolute;
             top: 0;
@@ -339,20 +338,17 @@
             </div>
         </div>
 
-        <!-- 手機專用虛擬控制按鈕：底部橫向長方形 -->
         <div id="mobile-controls">
             <button class="virtual-btn" id="btn-jump">JUMP</button>
             <button class="virtual-btn" id="btn-dash">DASH</button>
         </div>
 
-        <!-- 開始畫面 -->
         <div class="overlay-screen" id="start-screen">
             <h1>CYBER ARCADE<br>1946: 賽博方程</h1>
             <button class="menu-btn" onclick="startGame()">INSERT COIN / START</button>
             <button class="menu-btn" onclick="openTop50Modal()" style="border-color: #00ffff; color: #00ffff; box-shadow: 0 0 10px #00ffff;">全球前 50 名排行榜</button>
         </div>
 
-        <!-- 暫停畫面 -->
         <div class="overlay-screen" id="pause-screen" style="display: none;">
             <h1>GAME PAUSED</h1>
             <p>SYSTEM HALTED</p>
@@ -361,7 +357,6 @@
             <button class="menu-btn" onclick="returnToStartScreen()">MAIN MENU</button>
         </div>
 
-        <!-- 結束畫面 -->
         <div class="overlay-screen" id="gameover-screen" style="display: none;">
             <h1 style="color: #ff0000; text-shadow: 3px 3px #ffff00;">GAME OVER</h1>
             <div style="font-size: 13px; color: #00ffcc; margin-bottom: 15px; line-height: 1.6;">
@@ -383,7 +378,6 @@
             </div>
         </div>
 
-        <!-- 全球前 50 名彈窗 -->
         <div id="modal-leaderboard">
             <div class="modal-content">
                 <div class="modal-header">GLOBAL TOP 50 LEADERBOARD</div>
@@ -395,7 +389,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDK 與 Discord 排名同步 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, push, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -615,7 +608,6 @@
         };
     </script>
 
-    <!-- 遊戲主體與音訊、靈敏控制系統 -->
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -634,12 +626,27 @@
 
         function initAudio() {
             if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
+
+        // 全域強制互動解鎖（只要使用者點擊畫面的任何地方，立即解鎖 AudioContext 並重啟 BGM）
+        function unlockAudioSystem() {
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            if (gameState === 'PLAYING' && !bgmInterval) {
+                startBGM();
+            }
+        }
+        window.addEventListener('pointerdown', unlockAudioSystem, { once: false });
+        window.addEventListener('touchstart', unlockAudioSystem, { once: false, passive: true });
+        window.addEventListener('mousedown', unlockAudioSystem, { once: false });
 
         const bgmNotes = [220.00, 261.63, 329.63, 392.00, 246.94, 293.66, 349.23, 440.00];
         function startBGM() {
@@ -648,12 +655,16 @@
             bgmInterval = setInterval(() => {
                 if (gameState !== 'PLAYING' || !audioCtx) return;
                 try {
+                    if (audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                        return;
+                    }
                     let osc = audioCtx.createOscillator();
                     let gain = audioCtx.createGain();
                     let t = audioCtx.currentTime;
                     osc.type = 'square';
                     osc.frequency.setValueAtTime(bgmNotes[noteIndex], t);
-                    gain.gain.setValueAtTime(0.04, t);
+                    gain.gain.setValueAtTime(0.05, t);
                     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
                     osc.connect(gain);
                     gain.connect(audioCtx.destination);
@@ -672,6 +683,7 @@
             initAudio();
             if (!audioCtx) return;
             try {
+                if (audioCtx.state === 'suspended') { audioCtx.resume(); }
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
                 let t = audioCtx.currentTime;
@@ -768,14 +780,13 @@
             }
         });
 
-        // 徹底強化手機觸控按鈕：支援 pointerdown、touchstart、mousedown 立即反應
         const btnJump = document.getElementById('btn-jump');
         const btnDash = document.getElementById('btn-dash');
 
         function handleJumpAction(e) {
             e.preventDefault();
             e.stopPropagation();
-            initAudio();
+            unlockAudioSystem();
             if (gameState === 'PLAYING') {
                 jump();
             }
@@ -784,7 +795,7 @@
         function handleDashStart(e) {
             e.preventDefault();
             e.stopPropagation();
-            initAudio();
+            unlockAudioSystem();
             if (gameState === 'PLAYING' && !player.isDash && player.dashTimeLeft > 0) {
                 triggerDash(true);
                 btnDash.classList.add('touched');
@@ -800,7 +811,6 @@
             }
         }
 
-        // 綁定全方位事件，保證任何裝置點擊絕不失靈
         btnJump.addEventListener('pointerdown', handleJumpAction);
         btnJump.addEventListener('touchstart', handleJumpAction, { passive: false });
         btnJump.addEventListener('mousedown', handleJumpAction);
@@ -838,7 +848,7 @@
         }
 
         function startGame() {
-            initAudio();
+            unlockAudioSystem();
             startBGM();
             gameState = 'PLAYING';
             score = 0; combo = 0; gameSpeed = 9;
@@ -863,7 +873,7 @@
         }
 
         function togglePause() {
-            initAudio();
+            unlockAudioSystem();
             if (gameState === 'PLAYING') {
                 gameState = 'PAUSED';
                 stopBGM();
